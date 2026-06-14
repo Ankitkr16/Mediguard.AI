@@ -1,0 +1,13 @@
+{
+    "model_type": "XGBoost",
+    "features": [
+        "num_medicines",
+        "has_high_risk_pair",
+        "has_medium_risk_pair",
+        "total_side_effects",
+        "age_group",
+        "has_alcohol",
+        "has_allergy_match",
+        "duplicate_ingredients_count"
+    ]
+}
