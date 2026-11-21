@@ -34,59 +34,63 @@ collection = None
 embedding_model = None
 
 try:
-    import chromadb
-    from chromadb.config import Settings
-    from sentence_transformers import SentenceTransformer
-    
-    # 1. Initialize sentence transformer
-    print("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
-    embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-    
-    # 2. Initialize ChromaDB
-    chroma_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chroma_db")
-    os.makedirs(chroma_dir, exist_ok=True)
-    
-    db_client = chromadb.PersistentClient(path=chroma_dir)
-    
-    # Create or get collection
-    collection = db_client.get_or_create_collection("drug_monographs")
-    
-    # Check if collection is empty, then seed it
-    if collection.count() == 0:
-        print("Seeding ChromaDB with drug monographs...")
-        documents = []
-        metadatas = []
-        ids = []
-        embeddings = []
+    low_mem = os.getenv("LOW_MEMORY_MODE", "1").lower() in ("1", "true") or os.getenv("RENDER") == "true"
+    if not low_mem:
+        import chromadb
+        from chromadb.config import Settings
+        from sentence_transformers import SentenceTransformer
         
-        for drug_name, details in DRUG_DATABASE.items():
-            # Construct a comprehensive document string for embedding
-            doc_text = f"Drug: {drug_name.capitalize()}\n"
-            doc_text += f"Category: {details['category']}\n"
-            doc_text += f"Purpose: {details['purpose']}\n"
-            doc_text += f"Common Side Effects: {', '.join(details['side_effects']['common'])}\n"
-            doc_text += f"Serious Warning Symptoms: {', '.join(details['side_effects']['serious'])}\n"
-            doc_text += f"Alcohol Interaction: {details['alcohol_interaction']['effects']}\n"
-            doc_text += f"Food Interaction: {', '.join(details['food_interactions'])}\n"
-            doc_text += f"Precautions: {', '.join(details['precautions'])}"
+        # 1. Initialize sentence transformer
+        print("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
+        embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        
+        # 2. Initialize ChromaDB
+        chroma_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chroma_db")
+        os.makedirs(chroma_dir, exist_ok=True)
+        
+        db_client = chromadb.PersistentClient(path=chroma_dir)
+        
+        # Create or get collection
+        collection = db_client.get_or_create_collection("drug_monographs")
+        
+        # Check if collection is empty, then seed it
+        if collection.count() == 0:
+            print("Seeding ChromaDB with drug monographs...")
+            documents = []
+            metadatas = []
+            ids = []
+            embeddings = []
             
-            documents.append(doc_text)
-            metadatas.append({"drug": drug_name})
-            ids.append(drug_name)
-            
-            # Generate embedding
-            emb = embedding_model.encode(doc_text).tolist()
-            embeddings.append(emb)
-            
-        collection.add(
-            documents=documents,
-            metadatas=metadatas,
-            ids=ids,
-            embeddings=embeddings
-        )
-        print(f"Seeded {len(ids)} drug monographs into ChromaDB.")
+            for drug_name, details in DRUG_DATABASE.items():
+                # Construct a comprehensive document string for embedding
+                doc_text = f"Drug: {drug_name.capitalize()}\n"
+                doc_text += f"Category: {details['category']}\n"
+                doc_text += f"Purpose: {details['purpose']}\n"
+                doc_text += f"Common Side Effects: {', '.join(details['side_effects']['common'])}\n"
+                doc_text += f"Serious Warning Symptoms: {', '.join(details['side_effects']['serious'])}\n"
+                doc_text += f"Alcohol Interaction: {details['alcohol_interaction']['effects']}\n"
+                doc_text += f"Food Interaction: {', '.join(details['food_interactions'])}\n"
+                doc_text += f"Precautions: {', '.join(details['precautions'])}"
+                
+                documents.append(doc_text)
+                metadatas.append({"drug": drug_name})
+                ids.append(drug_name)
+                
+                # Generate embedding
+                emb = embedding_model.encode(doc_text).tolist()
+                embeddings.append(emb)
+                
+            collection.add(
+                documents=documents,
+                metadatas=metadatas,
+                ids=ids,
+                embeddings=embeddings
+            )
+            print(f"Seeded {len(ids)} drug monographs into ChromaDB.")
+        else:
+            print(f"ChromaDB already initialized with {collection.count()} items.")
     else:
-        print(f"ChromaDB already initialized with {collection.count()} items.")
+        print("Low Memory / Cloud Mode: Skipping heavy SentenceTransformers/ChromaDB to stay within RAM limits (<512MB). Using fast semantic dictionary matching.")
         
 except Exception as e:
     print(f"Warning: RAG stack initialization skipped/failed ({e}). Utilizing Python dictionary-based semantic search fallback.")

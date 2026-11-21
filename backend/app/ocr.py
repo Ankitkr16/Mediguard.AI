@@ -4,14 +4,17 @@ from datetime import datetime
 from PIL import Image
 from backend.app.drug_data import DRUG_DATABASE
 
-# Try to initialize EasyOCR. If it fails, we will print a warning and use the fallback rule-based system.
+# Try to initialize EasyOCR. If running in cloud/low memory mode (<512MB RAM), use the fallback rule-based system.
 reader = None
 try:
-    import easyocr
-    # Initialize reader with English. It will download the models on demand.
-    # GPU=False for local CPU execution by default, but easyocr handles it.
-    reader = easyocr.Reader(['en'], gpu=False)
-    print("EasyOCR reader initialized successfully.")
+    low_mem = os.getenv("LOW_MEMORY_MODE", "1").lower() in ("1", "true") or os.getenv("RENDER") == "true"
+    if not low_mem:
+        import easyocr
+        # Initialize reader with English. It will download the models on demand.
+        reader = easyocr.Reader(['en'], gpu=False)
+        print("EasyOCR reader initialized successfully.")
+    else:
+        print("Low Memory / Cloud Mode: Skipping heavy EasyOCR PyTorch model initialization to stay within RAM limits (<512MB).")
 except Exception as e:
     print(f"Warning: EasyOCR could not be initialized ({e}). Using mock OCR fallbacks for image processing.")
 
